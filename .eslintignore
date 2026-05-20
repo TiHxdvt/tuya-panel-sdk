@@ -4,3 +4,5 @@ dist
 .eslintrc.js
 .prettierrc.js
 **/*.d.ts
+harmony-fix
+stubs

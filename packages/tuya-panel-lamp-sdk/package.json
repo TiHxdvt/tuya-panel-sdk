@@ -3,6 +3,7 @@
   "version": "1.14.1",
   "description": "涂鸦照明业务组件库",
   "main": "./lib/index.js",
+  "files": ["lib"],
   "scripts": {
     "dev": "tsc -w",
     "prebuild": "../../node_modules/del-cli/cli.js lib/",

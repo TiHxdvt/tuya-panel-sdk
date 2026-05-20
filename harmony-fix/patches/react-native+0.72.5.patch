@@ -1,0 +1,23 @@
+diff --git a/node_modules/react-native/Libraries/ReactNative/requireNativeComponent.js b/node_modules/react-native/Libraries/ReactNative/requireNativeComponent.js
+index e9be731..98ddece 100644
+--- a/node_modules/react-native/Libraries/ReactNative/requireNativeComponent.js
++++ b/node_modules/react-native/Libraries/ReactNative/requireNativeComponent.js
+@@ -24,9 +24,15 @@ const getNativeComponentAttributes = require('./getNativeComponentAttributes');
+  *
+  */
+ 
+-const requireNativeComponent = <T>(uiViewClassName: string): HostComponent<T> =>
+-  ((createReactNativeComponentClass(uiViewClassName, () =>
+-    getNativeComponentAttributes(uiViewClassName),
++const requireNativeComponent = <T>(uiViewClassName: string): HostComponent<T> => {
++  // 校验并处理 uiViewClassName 参数
++  const processedClassName = uiViewClassName.startsWith('TYRCT') 
++    ? uiViewClassName.replace('TYRCT', 'TRCT')
++    : uiViewClassName;
++    
++  return ((createReactNativeComponentClass(processedClassName, () =>
++    getNativeComponentAttributes(processedClassName),
+   ): any): HostComponent<T>);
++};
+ 
+ export default requireNativeComponent;

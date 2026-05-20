@@ -14,6 +14,7 @@ const root = path.resolve(__dirname, '..');
 const blacklistRE = blacklist([
   ...modules.map(m => new RegExp(`^${escape(path.join(root, 'node_modules', m))}\\/.*$`)),
   new RegExp(`^${escape(path.join(root, 'packages/tuya-panel-lamp-sdk/node_modules'))}\\/.*$`),
+  new RegExp(`^${escape(path.join(root, 'example_HO'))}\\/.*$`),
 ]);
 
 const extraNodeModules = modules.reduce((acc, name) => {

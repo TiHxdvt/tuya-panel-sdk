@@ -1,0 +1,3071 @@
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/TYNativeApi.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/TYNativeApi.js
+index 59ece22..b2b8b04 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/TYNativeApi.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/TYNativeApi.js
+@@ -9,6 +9,49 @@ var _extends = Object.assign || function (target) { for (var i = 1; i < argument
+ 
+ var _reactNative = require("react-native");
+ 
++function loadAndMountModuleForHarmony(moduleName) {
++  if (moduleName === 'UIManager') {
++    return require('react-native').NativeModules.UIManager;
++  }
++
++  if (!moduleName.startsWith('TYRCT') && !moduleName.startsWith('TRCT')) {
++    return {};
++  }
++
++  let trctName = moduleName;
++  let tyrctName = moduleName;
++
++  if (moduleName.startsWith('TYRCT')) {
++    trctName = moduleName.replace(/^TYRCT/, 'TRCT');
++  } else if (moduleName.startsWith('TRCT')) {
++    tyrctName = moduleName.replace(/^TRCT/, 'TYRCT');
++  }
++
++  const module = _reactNative.TurboModuleRegistry.get(trctName);
++
++  if (module && _reactNative.Platform.OS === 'harmony') {
++    if (trctName.startsWith('TRCT')) {
++      _reactNative.NativeModules[trctName] = module;
++      _reactNative.NativeModules[tyrctName] = module;
++    } else if (trctName.startsWith('TYRCT')) {
++      _reactNative.NativeModules[trctName] = module;
++      _reactNative.NativeModules[tyrctName] = module;
++    } else {
++      _reactNative.NativeModules[moduleName] = module;
++    }
++  }
++
++  return module;
++}
++
++loadAndMountModuleForHarmony('TYRCTPublicModule');
++loadAndMountModuleForHarmony('TYRCTPublicManager');
++loadAndMountModuleForHarmony('TYRCTDeviceModule');
++loadAndMountModuleForHarmony('TYRCTPanelManager');
++loadAndMountModuleForHarmony('TYRCTBluetoothUtilManager');
++loadAndMountModuleForHarmony('TYRCTBTManager');
++loadAndMountModuleForHarmony('TYRCTNavManager');
++
+ var _events = require("events");
+ 
+ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+@@ -112,11 +155,19 @@ var INTERNAL_EVENT_TYPE = ["error", "newListener", "removeListener", "dpDataChan
+     Device = {},
+     App = {};var Native = {},
+     apiRequest = void 0;var TYDeviceData = {};var TYMobileData = {};if (_reactNative.NativeModules) {
+-  _TYAppNative = _reactNative.NativeModules.TYRCTPublicModule || _reactNative.NativeModules.TYRCTPublicManager, _TYDeviceDevice = _reactNative.NativeModules.TYRCTDeviceModule || _reactNative.NativeModules.TYRCTPanelManager, AppDeviceEventEmitter = _reactNative.Platform.select({ ios: function ios() {
+-      return _reactNative.NativeAppEventEmitter;
+-    }, android: function android() {
+-      return _reactNative.DeviceEventEmitter;
+-    } })();var e = new _events.EventEmitter();e.setMaxListeners(0);var t = ["on", "once", "emit"];if (t.forEach(function (t) {
++  _TYAppNative = _reactNative.NativeModules.TYRCTPublicModule || _reactNative.NativeModules.TYRCTPublicManager, _TYDeviceDevice = _reactNative.NativeModules.TYRCTDeviceModule || _reactNative.NativeModules.TYRCTPanelManager, AppDeviceEventEmitter = _reactNative.Platform.select({
++    ios: function ios() {
++        return _reactNative.NativeAppEventEmitter;
++      },
++
++    android: function android() {
++        return _reactNative.DeviceEventEmitter;
++      },
++
++    harmony: function android() {
++        return _reactNative.DeviceEventEmitter;
++      }
++  })();var e = new _events.EventEmitter();e.setMaxListeners(0);var t = ["on", "once", "emit"];if (t.forEach(function (t) {
+     Event[t] = e[t].bind(e);
+   }), Event.fire = e.emit.bind(e), Event.remove = e.removeListener.bind(e), Event.off = function (t) {
+     1 === arguments.length && e.removeAllListeners(t), 2 === arguments.length && e.removeListener(t, arguments[1]);
+@@ -353,9 +404,30 @@ var INTERNAL_EVENT_TYPE = ["error", "newListener", "removeListener", "dpDataChan
+       Event.emit("bluetoothStateChanged", e.state);
+     }), AppDeviceEventEmitter.addListener("deviceStateChange", function (e) {
+       void 0 !== e && void 0 !== e.state && Event.emit("deviceDataChange", { type: "deviceOnline", payload: { deviceOnline: e.state } });
+-    }), AppDeviceEventEmitter.addListener("networkStateChange", function (e) {
++    }), AppDeviceEventEmitter.addListener("networkStateChange", (function(orig) {
++      var timer = null;
++      var last = null;
++
++      return function(e) {
++        if (typeof Platform !== 'undefined' && Platform.OS === 'harmony' || typeof _reactNative !== 'undefined' && _reactNative.Platform && _reactNative.Platform.OS === 'harmony') {
++          if (timer) {
++            clearTimeout(timer);
++          }
++
++          last = e;
++
++          timer = setTimeout(function() {
++            return orig(last);
++          }, 1500);
++
++          return;
++        } else {
++          return orig(e);
++        }
++      };
++    })(function (e) {
+       void 0 !== e && void 0 !== e.state && Event.emit("networkStateChange", { appOnline: e.state });
+-    }), AppDeviceEventEmitter.addListener("linkageTimeUpdate", function () {
++    })), AppDeviceEventEmitter.addListener("linkageTimeUpdate", function () {
+       Event.emit("linkageTimeUpdate", {});
+     }), AppDeviceEventEmitter.addListener("deviceLocalStateChange", function (e) {
+       void 0 !== e && void 0 !== e.state && Event.emit("deviceLocalStateChange", { state: e.state });
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/items/input-item.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/items/input-item.js
+index 6e3e09b..07b48bb 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/items/input-item.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/items/input-item.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -63,7 +65,7 @@ function InputItem(_ref) {
+         title
+       ),
+       _react2.default.createElement(_reactNative.TextInput, _extends({
+-        style: [styles.textInput, { padding: _reactNative.Platform.OS === 'android' ? 0 : null }, inputStyle],
++        style: [styles.textInput, { padding: _reactNative.Platform.OS !== 'ios' ? 0 : null }, inputStyle],
+         placeholderTextColor: '#dbdbdb',
+         underlineColorAndroid: 'transparent'
+       }, textInputProps, {
+@@ -92,7 +94,7 @@ InputItem.propTypes = _extends({}, _listItem2.default.propTypes, _reactNative.Te
+ 
+   titleStyle: _reactNative.Text.propTypes.style,
+ 
+-  inputStyle: _reactNative.ViewPropTypes.style
++  inputStyle: _reactNativeCommunity_18482815172['default'].style
+ });
+ 
+ InputItem.defaultProps = {
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/items/slider-item.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/items/slider-item.js
+index ad6af3f..2565468 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/items/slider-item.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/items/slider-item.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -264,13 +266,13 @@ SliderItem.propTypes = _extends({}, _slider2.default.propTypes, {
+ 
+   iconColor: _reactNative.ColorPropType,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   textStyle: _reactNative.Text.propTypes.style,
+ 
+-  sliderStyle: _reactNative.ViewPropTypes.style,
++  sliderStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   imageFollowIconColor: _propTypes2.default.bool,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/list-item.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/list-item.js
+index ccc24c9..b93886f 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/list-item.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/list-item.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -361,11 +363,11 @@ var TYListItem = function (_Component) {
+ 
+ TYListItem.propTypes = _extends({}, _reactNative.TouchableOpacity.propTypes, {
+   styles: _propTypes2.default.oneOfType([_propTypes2.default.bool, _propTypes2.default.shape({
+-    container: _reactNative.ViewPropTypes.style,
+-    content: _reactNative.ViewPropTypes.style,
+-    contentLeft: _reactNative.ViewPropTypes.style,
+-    contentCenter: _reactNative.ViewPropTypes.style,
+-    contentRight: _reactNative.ViewPropTypes.style,
++    container: _reactNativeCommunity_18482815172['default'].style,
++    content: _reactNativeCommunity_18482815172['default'].style,
++    contentLeft: _reactNativeCommunity_18482815172['default'].style,
++    contentCenter: _reactNativeCommunity_18482815172['default'].style,
++    contentRight: _reactNativeCommunity_18482815172['default'].style,
+     title: _reactNative.Text.propTypes.style,
+     subTitle: _reactNative.Text.propTypes.style
+   })]),
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/list.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/list.js
+index 82b3b2c..2a0734f 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/list.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/list.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -207,7 +209,7 @@ TYFlatList.propTypes = _extends({}, _reactNative.FlatList.propTypes, {
+     SwitchButtonProps: _propTypes2.default.shape(_extends({}, _switchButton2.default.propTypes))
+   }, _listItem2.default.propTypes))).isRequired,
+ 
+-  separatorStyle: _reactNative.ViewPropTypes.style,
++  separatorStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   flatListRef: _propTypes2.default.func,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/lists.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/lists.js
+index f0b13f3..68c6c7f 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/lists.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYLists/lists.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -266,7 +268,7 @@ TYSectionLists.propTypes = _extends({}, _reactNative.SectionList.propTypes, {
+ 
+   headerStyle: _reactNative.Text.propTypes.style,
+ 
+-  separatorStyle: _reactNative.ViewPropTypes.style,
++  separatorStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   sectionListRef: _propTypes2.default.func,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYText/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYText/index.js
+index 09368a7..37104a7 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYText/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/TYText/index.js
+@@ -55,8 +55,8 @@ var TYText = function (_React$Component) {
+   }
+ 
+   _createClass(TYText, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       this.setState({ text: nextProps.text ? nextProps.text : nextProps.children });
+     }
+   }, {
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button-brick/button.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button-brick/button.js
+index b288db5..876c030 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button-brick/button.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button-brick/button.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -331,7 +333,7 @@ var BrickButton = function (_React$PureComponent) {
+ }(_react2.default.PureComponent);
+ 
+ BrickButton.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   onPress: _propTypes2.default.func,
+ 
+@@ -345,7 +347,7 @@ BrickButton.propTypes = {
+ 
+   type: _propTypes2.default.oneOf(['primary', 'primaryGradient', 'primaryBorder', 'normal', 'small']),
+ 
+-  wrapperStyle: _reactNative.ViewPropTypes.style,
++  wrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   backgroundColorTouched: _reactNative.ColorPropType,
+ 
+@@ -363,7 +365,7 @@ BrickButton.propTypes = {
+ 
+   loadingSize: _propTypes2.default.oneOfType([_propTypes2.default.oneOf(['small', 'large']), _propTypes2.default.number]),
+ 
+-  loadingStyle: _reactNative.ViewPropTypes.style,
++  loadingStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   loadingStrokeWidth: _propTypes2.default.number,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button-brick/loading.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button-brick/loading.js
+index e003efa..e4f21bb 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button-brick/loading.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button-brick/loading.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -102,7 +104,7 @@ Loading.propTypes = {
+   loading: _propTypes2.default.bool,
+   color: _reactNative.ColorPropType,
+   backgroundColor: _reactNative.ColorPropType,
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+   size: _propTypes2.default.number,
+   strokeWidth: _propTypes2.default.number
+ };
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button/button.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button/button.js
+index 6002293..b8fe997 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button/button.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/button/button.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -404,21 +406,21 @@ CircleBtn.propTypes = {
+ 
+   imageColor: _reactNative.ColorPropType,
+ 
+-  imageStyle: _reactNative.ViewPropTypes.style,
++  imageStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   badgeText: _propTypes2.default.string,
+ 
+   disabledOpacity: _propTypes2.default.number,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  wrapperStyle: _reactNative.ViewPropTypes.style,
++  wrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   border: _propTypes2.default.oneOfType([_propTypes2.default.string, _propTypes2.default.bool, _propTypes2.default.number]),
+ 
+   textStyle: _reactNative.Text.propTypes.style,
+ 
+-  badgeStyle: _reactNative.ViewPropTypes.style,
++  badgeStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   badgeTextStyle: _reactNative.Text.propTypes.style,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/carousel/dot.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/carousel/dot.js
+index 843cf97..152668b 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/carousel/dot.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/carousel/dot.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -78,9 +80,9 @@ var defaultDot = function defaultDot(props) {
+ };
+ 
+ defaultDot.propTypes = {
+-  dotStyle: _reactNative.ViewPropTypes.style,
+-  dotActiveStyle: _reactNative.ViewPropTypes.style,
+-  dotWrapperStyle: _reactNative.ViewPropTypes.style,
++  dotStyle: _reactNativeCommunity_18482815172['default'].style,
++  dotActiveStyle: _reactNativeCommunity_18482815172['default'].style,
++  dotWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+   count: _propTypes2.default.number,
+   currentIndex: _propTypes2.default.number
+ };
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/carousel/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/carousel/index.js
+index 5a446d4..5e86edd 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/carousel/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/carousel/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -62,8 +64,8 @@ var Carousel = function (_React$Component) {
+       this.autoplay();
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       var _this2 = this;
+ 
+       var children = nextProps.children,
+@@ -199,11 +201,11 @@ Carousel.propTypes = {
+ 
+   dots: _propTypes2.default.oneOfType([_propTypes2.default.element, _propTypes2.default.func]),
+ 
+-  dotStyle: _reactNative.ViewPropTypes.style,
++  dotStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  dotActiveStyle: _reactNative.ViewPropTypes.style,
++  dotActiveStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  pageStyle: _reactNative.ViewPropTypes.style,
++  pageStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   useViewPagerOnAndroid: _propTypes2.default.bool
+ };
+@@ -295,7 +297,7 @@ var _initialiseProps = function _initialiseProps() {
+   };
+ 
+   this.androidScrollTo = function (offset, isViewPager) {
+-    if (_reactNative.Platform.OS === 'android' && !isViewPager) {
++    if (_reactNative.Platform.OS !== 'ios' && !isViewPager) {
+       _this3.firstScrollTimer = setTimeout(function () {
+         _this3.scrollview.scrollTo({ x: offset, y: 0, animated: false });
+       }, 0);
+@@ -303,7 +305,7 @@ var _initialiseProps = function _initialiseProps() {
+   };
+ 
+   this.loopJump = function () {
+-    if (_this3.state.loopJump && _reactNative.Platform.OS === 'android') {
++    if (_this3.state.loopJump && _reactNative.Platform.OS !== 'ios') {
+       var i = _this3.state.selectedIndex + (_this3.props.loop ? 1 : 0);
+       if (_this3.props.useViewPagerOnAndroid) {
+         _this3.loopJumpTimer = setTimeout(function () {
+@@ -358,7 +360,7 @@ var _initialiseProps = function _initialiseProps() {
+     if (isScrolling || _this3.count < 2) return;
+     var diff = selectedIndex + 1 + (_this3.props.loop ? 1 : 0);
+     var offsetX = diff * width;
+-    if (_reactNative.Platform.OS === 'android' && _this3.props.useViewPagerOnAndroid) {
++    if (_reactNative.Platform.OS !== 'ios' && _this3.props.useViewPagerOnAndroid) {
+       _this3.scrollview && _this3.scrollview.setPage(diff);
+     } else {
+       _this3.scrollview && _this3.scrollview.scrollTo({ x: offsetX, y: 0 });
+@@ -367,7 +369,7 @@ var _initialiseProps = function _initialiseProps() {
+       isScrolling: true,
+       autoplayStop: false
+     });
+-    if (_reactNative.Platform.OS === 'android') {
++    if (_reactNative.Platform.OS !== 'ios') {
+       _this3.androidScrollEndTimer = setTimeout(function () {
+         _this3.onScrollEnd({
+           nativeEvent: {
+@@ -403,7 +405,7 @@ var _initialiseProps = function _initialiseProps() {
+   };
+ 
+   this._renderScroll = function (pages) {
+-    if (_reactNative.Platform.OS === 'android' && _this3.props.useViewPagerOnAndroid && _reactNative.Platform.OS !== 'harmony') {
++    if (_reactNative.Platform.OS !== 'ios' && _this3.props.useViewPagerOnAndroid && _reactNative.Platform.OS !== 'harmony') {
+       return _react2.default.createElement(
+         _reactNative.ViewPagerAndroid,
+         _extends({
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/checkbox/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/checkbox/index.js
+index 402ca38..51ae1db 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/checkbox/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/checkbox/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -131,7 +133,7 @@ var Checkbox = function (_Component) {
+ Checkbox.propTypes = {
+   accessibilityLabel: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   size: _propTypes2.default.number,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/circle-view/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/circle-view/index.js
+index 94bfd77..ec70dc4 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/circle-view/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/circle-view/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -61,7 +63,7 @@ var CircleView = function CircleView(props) {
+ };
+ 
+ CircleView.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   children: _propTypes2.default.node,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/collapsible/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/collapsible/index.js
+index 7130e16..ca3bdb1 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/collapsible/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/collapsible/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -259,7 +261,7 @@ Collapsible.propTypes = {
+ 
+   easing: _propTypes2.default.oneOfType([_propTypes2.default.string, _propTypes2.default.func]),
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   onChange: _propTypes2.default.func,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/controller-bar/bar-group.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/controller-bar/bar-group.js
+index aac5950..e5e480e 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/controller-bar/bar-group.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/controller-bar/bar-group.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -101,8 +103,8 @@ BarGroup.propTypes = {
+   size: _propTypes2.default.oneOfType([_propTypes2.default.oneOf(['large', 'normal', 'small']), _propTypes2.default.number]),
+   swiperConfig: _propTypes2.default.shape(_carousel2.default.propTypes),
+   children: _propTypes2.default.oneOfType([_propTypes2.default.array, _propTypes2.default.element]).isRequired,
+-  style: _reactNative.ViewPropTypes.style,
+-  wrapperStyle: _reactNative.ViewPropTypes.style
++  style: _reactNativeCommunity_18482815172['default'].style,
++  wrapperStyle: _reactNativeCommunity_18482815172['default'].style
+ };
+ BarGroup.defaultProps = {
+   type: 'warp',
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/controller-bar/bar.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/controller-bar/bar.js
+index f1f9668..db30ea5 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/controller-bar/bar.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/controller-bar/bar.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -166,11 +168,11 @@ ControllerBar.propTypes = {
+ 
+   hasBottomBorder: _propTypes2.default.bool,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   button: _propTypes2.default.array.isRequired,
+ 
+-  wrapperStyle: _reactNative.ViewPropTypes.style
++  wrapperStyle: _reactNativeCommunity_18482815172['default'].style
+ };
+ ControllerBar.defaultProps = {
+   type: 'normal',
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/date-picker/datePicker.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/date-picker/datePicker.js
+index ad384c0..dceaebc 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/date-picker/datePicker.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/date-picker/datePicker.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -419,8 +421,8 @@ var DatePicker = function (_React$Component) {
+   }
+ 
+   _createClass(DatePicker, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if ('date' in nextProps) {
+         this.setState({ date: nextProps.date || nextProps.defaultDate });
+       }
+@@ -590,7 +592,7 @@ DatePicker.propTypes = {
+ 
+   defaultDate: _propTypes2.default.object,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   pickerFontColor: _propTypes2.default.string,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/alert.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/alert.js
+index e189354..4b7924c 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/alert.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/alert.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -90,9 +92,9 @@ var Alert = function Alert(_ref) {
+ };
+ 
+ Alert.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   title: _propTypes2.default.string.isRequired,
+ 
+@@ -102,7 +104,7 @@ Alert.propTypes = {
+ 
+   subTitleStyle: _TYText2.default.propTypes.style,
+ 
+-  footerWrapperStyle: _reactNative.ViewPropTypes.style,
++  footerWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   confirmText: _propTypes2.default.string.isRequired,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/checkbox.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/checkbox.js
+index d535b96..97d5c50 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/checkbox.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/checkbox.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -147,8 +149,8 @@ var CheckBoxDialog = function (_Component) {
+   }
+ 
+   _createClass(CheckBoxDialog, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (this.state.value !== nextProps.value && this.props.value !== nextProps.value) {
+         this.setState({ value: nextProps.value });
+       }
+@@ -273,9 +275,9 @@ CheckBoxDialog.propTypes = {
+ 
+   onChange: _propTypes2.default.func,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  headerStyle: _reactNative.ViewPropTypes.style,
++  headerStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   titleNumberOfLines: _propTypes2.default.number,
+ 
+@@ -287,9 +289,9 @@ CheckBoxDialog.propTypes = {
+ 
+   subTitleStyle: _TYText2.default.propTypes.style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  footerWrapperStyle: _reactNative.ViewPropTypes.style,
++  footerWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   cancelText: _propTypes2.default.string.isRequired,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/confirm.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/confirm.js
+index b955a09..5656a4c 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/confirm.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/confirm.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -119,9 +121,9 @@ var Confirm = function Confirm(_ref) {
+ };
+ 
+ Confirm.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   title: _propTypes2.default.string.isRequired,
+ 
+@@ -131,7 +133,7 @@ Confirm.propTypes = {
+ 
+   subTitleStyle: _TYText2.default.propTypes.style,
+ 
+-  footerWrapperStyle: _reactNative.ViewPropTypes.style,
++  footerWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   cancelText: _propTypes2.default.string.isRequired,
+ 
+@@ -151,7 +153,7 @@ Confirm.propTypes = {
+ 
+   imageSource: _propTypes2.default.oneOfType([_propTypes2.default.object, _propTypes2.default.number]),
+ 
+-  imageStyle: _reactNative.ViewPropTypes.style,
++  imageStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   iconPath: _propTypes2.default.string,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/custom.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/custom.js
+index 753aa8b..0bef375 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/custom.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/custom.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -154,9 +156,9 @@ CustomDialog.propTypes = {
+ 
+   footer: _propTypes2.default.oneOfType([_propTypes2.default.element, _propTypes2.default.func]),
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  headerStyle: _reactNative.ViewPropTypes.style,
++  headerStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   titleNumberOfLines: _propTypes2.default.number,
+ 
+@@ -168,7 +170,7 @@ CustomDialog.propTypes = {
+ 
+   subTitleStyle: _TYText2.default.propTypes.style,
+ 
+-  footerWrapperStyle: _reactNative.ViewPropTypes.style,
++  footerWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   cancelText: _propTypes2.default.string.isRequired,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/footer.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/footer.js
+index bde0994..c8968ce 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/footer.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/footer.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -160,7 +162,7 @@ var DialogFooter = exports.DialogFooter = function (_React$Component) {
+ }(_react2.default.Component);
+ 
+ DialogFooter.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+   cancelText: _propTypes2.default.string,
+   cancelTextStyle: _TYText2.default.propTypes.style,
+   cancelAccessibilityLabel: _propTypes2.default.string,
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/list.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/list.js
+index 59c6dc0..4f51e73 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/list.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/list.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -186,11 +188,11 @@ List.propTypes = {
+ 
+   dataSource: _propTypes2.default.array.isRequired,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  listStyle: _reactNative.ViewPropTypes.style,
++  listStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   titleNumberOfLines: _propTypes2.default.number,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/password.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/password.js
+index c300cf0..1035e52 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/password.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/password.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -154,14 +156,14 @@ var Password = function (_Component) {
+ }(_react.Component);
+ 
+ Password.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+   titleNumberOfLines: _propTypes2.default.number,
+   title: _propTypes2.default.string.isRequired,
+   titleStyle: _TYText2.default.propTypes.style,
+   subTitle: _propTypes2.default.string,
+   subTitleStyle: _TYText2.default.propTypes.style,
+-  footerWrapperStyle: _reactNative.ViewPropTypes.style,
++  footerWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+   cancelText: _propTypes2.default.string.isRequired,
+   cancelTextStyle: _TYText2.default.propTypes.style,
+   cancelAccessibilityLabel: _propTypes2.default.string,
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/prompt.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/prompt.js
+index e887ed2..3e89247 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/prompt.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/dialog/prompt.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -218,19 +220,19 @@ Prompt.propTypes = _extends({}, _reactNative.TextInput.propTypes, {
+ 
+   onHelpPress: _propTypes2.default.func,
+ 
+-  inputWrapperStyle: _reactNative.ViewPropTypes.style,
++  inputWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   inputStyle: _reactNative.TextInput.propTypes.style,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   title: _propTypes2.default.string.isRequired,
+ 
+   titleStyle: _TYText2.default.propTypes.style,
+ 
+-  footerWrapperStyle: _reactNative.ViewPropTypes.style,
++  footerWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   cancelText: _propTypes2.default.string.isRequired,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/divider/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/divider/index.js
+index 7434bfd..abe60a3 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/divider/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/divider/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -50,7 +52,7 @@ function Divider(props) {
+ }
+ 
+ Divider.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   flexDirection: _propTypes2.default.oneOf(['row', 'column']),
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/global-toast/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/global-toast/index.js
+index a440b17..f5920d8 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/global-toast/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/global-toast/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -111,9 +113,9 @@ GlobalToast.propTypes = {
+ 
+   d: _propTypes2.default.oneOfType([_propTypes2.default.string, _propTypes2.default.array]),
+ 
+-  iconfontStyle: _reactNative.ViewPropTypes.style,
++  iconfontStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   showPosition: _propTypes2.default.string,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/gradient/linear-gradient.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/gradient/linear-gradient.js
+index 197f64b..db33a32 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/gradient/linear-gradient.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/gradient/linear-gradient.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -58,8 +60,8 @@ var LinearGradient = function (_Component) {
+   }
+ 
+   _createClass(LinearGradient, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       this.setState({
+         stops: nextProps.stops,
+         x1: nextProps.x1,
+@@ -144,7 +146,16 @@ var LinearGradient = function (_Component) {
+               __source: {
+                 fileName: _jsxFileName,
+                 lineNumber: 135
+-              }
++              },
++
++              key: JSON.stringify({
++                gradientId: gradientId,
++                x1: x1,
++                x2: x2,
++                y1: y1,
++                y2: y2,
++                stops: stops
++              })
+             },
+             _react2.default.createElement(
+               _reactNativeSvg.LinearGradient,
+@@ -181,7 +192,7 @@ LinearGradient.propTypes = {
+ 
+   stops: _propTypes2.default.object,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   x1: _propTypes2.default.string,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/gradient/radial-gradient.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/gradient/radial-gradient.js
+index f5ebf0c..58f3d5d 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/gradient/radial-gradient.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/gradient/radial-gradient.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -82,7 +84,12 @@ var RadialGradient = function (_Component) {
+               __source: {
+                 fileName: _jsxFileName,
+                 lineNumber: 96
+-              }
++              },
++
++              key: JSON.stringify({
++                gradientId: gradientId,
++                stops: stops
++              })
+             },
+             _react2.default.createElement(
+               _reactNativeSvg.RadialGradient,
+@@ -120,7 +127,7 @@ var RadialGradient = function (_Component) {
+ }(_react.Component);
+ 
+ RadialGradient.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   gradientId: _propTypes2.default.string,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/iconfont/art/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/iconfont/art/index.js
+index d6bcabe..f2d47f9 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/iconfont/art/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/iconfont/art/index.js
+@@ -1,3 +1,6 @@
++let appStateRes_change_132252343;
++var _reactNativeCommunity_1848281517 = require('@react-native-community/art');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -33,8 +36,8 @@ function _inherits(subClass, superClass) { if (typeof superClass !== "function"
+ 
+ var ReactNativeVersion = require('react-native/Libraries/Core/ReactNativeVersion');
+ 
+-var Surface = _reactNative.ART.Surface,
+-    Shape = _reactNative.ART.Shape;
++var Surface = _reactNativeCommunity_18482815172['default'].Surface,
++    Shape = _reactNativeCommunity_18482815172['default'].Shape;
+ 
+ var ShapeKey = 0;
+ 
+@@ -64,7 +67,7 @@ var IconSVG = exports.IconSVG = function (_React$Component) {
+   _createClass(IconSVG, [{
+     key: 'componentDidMount',
+     value: function componentDidMount() {
+-      this.cancelChangeListener = _reactNative.AppState.addEventListener('change', this._setAppState);
++      this.cancelChangeListener = appStateRes_change_132252343 = _reactNative.AppState.addEventListener('change', this._setAppState);;
+     }
+   }, {
+     key: 'componentWillUnmount',
+@@ -72,7 +75,7 @@ var IconSVG = exports.IconSVG = function (_React$Component) {
+       if (_reactNative.Platform.OS === 'harmony' && this.cancelChangeListener) {
+         typeof this.cancelChangeListener.remove === 'function' && this.cancelChangeListener.remove();
+       } else {
+-        _reactNative.AppState.removeEventListener('change', this._setAppState);
++        appStateRes_change_132252343 && appStateRes_change_132252343.remove();;
+       }
+     }
+   }, {
+@@ -141,7 +144,7 @@ var IconSVG = exports.IconSVG = function (_React$Component) {
+           children
+         );
+       };
+-      if (_reactNative.Platform.OS === 'android' && ReactNativeVersion.version.major * 1000 + ReactNativeVersion.version.minor >= 58) {
++      if (_reactNative.Platform.OS !== 'ios' && ReactNativeVersion.version.major * 1000 + ReactNativeVersion.version.minor >= 58) {
+         Container = function Container(_ref2) {
+           var children = _ref2.children;
+           return _react2.default.createElement(
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/iconfont/svg/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/iconfont/svg/index.js
+index 13002ac..62d938f 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/iconfont/svg/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/iconfont/svg/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -124,7 +126,7 @@ var IconFont = function (_Component) {
+ }(_react.Component);
+ 
+ IconFont.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   viewBox: _propTypes2.default.string,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/detect-net-modal/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/detect-net-modal/index.js
+index 570f302..8928300 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/detect-net-modal/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/detect-net-modal/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -234,8 +236,8 @@ var DetectNetModal = function (_PureComponent) {
+ DetectNetModal.propTypes = {
+   maskColor: _reactNative.ColorPropType,
+   onClose: _propTypes2.default.func,
+-  style: _reactNative.ViewPropTypes.style,
+-  animatedStyle: _reactNative.ViewPropTypes.style
++  style: _reactNativeCommunity_18482815172['default'].style,
++  animatedStyle: _reactNativeCommunity_18482815172['default'].style
+ };
+ DetectNetModal.defaultProps = {
+   maskColor: 'rgba(51, 51, 51, 0.8)',
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/full-view/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/full-view/index.js
+index e6da808..32a856e 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/full-view/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/full-view/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -429,8 +431,8 @@ var FullView = function (_Component) {
+ FullView.propTypes = {
+   theme: _propTypes2.default.object,
+   title: _propTypes2.default.string,
+-  style: _reactNative.ViewPropTypes.style,
+-  topbarStyle: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
++  topbarStyle: _reactNativeCommunity_18482815172['default'].style,
+   hideTopbar: _propTypes2.default.bool,
+   showMenu: _propTypes2.default.bool,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/navigator-layout/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/navigator-layout/index.js
+index 4b79bd8..54fa402 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/navigator-layout/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/navigator-layout/index.js
+@@ -1,3 +1,4 @@
++let appStateRes_change_132252343;
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -228,7 +229,7 @@ var NavigatorLayout = function (_Component) {
+ 
+       var hideSignalPop = get(_TYNativeApi.TYSdk, 'devInfo.panelConfig.fun.hideSignalPop', false);
+ 
+-      if (_reactNative.Platform.OS === 'android') {
++      if (_reactNative.Platform.OS !== 'ios') {
+         _reactNative.BackHandler.addEventListener('hardwareBackPress', this._onBack);
+       }
+ 
+@@ -237,7 +238,7 @@ var NavigatorLayout = function (_Component) {
+       _api2.default.receiverMqttData(23);
+       _api2.default.sendMqttData(22);
+       _TYNativeApi.TYSdk.DeviceEventEmitter.addListener('receiveMqttData', this._handleMqttSignal);
+-      this.cancelChangeListener = this.state.isMqttNoticeActive && _reactNative.AppState.addEventListener('change', this._handleAppStateChange);
++      this.cancelChangeListener = this.state.isMqttNoticeActive && (appStateRes_change_132252343 = _reactNative.AppState.addEventListener('change', this._handleAppStateChange));;
+     }
+   }, {
+     key: 'componentWillUnmount',
+@@ -247,7 +248,7 @@ var NavigatorLayout = function (_Component) {
+ 
+       var hideSignalPop = get(_TYNativeApi.TYSdk, 'devInfo.panelConfig.fun.hideSignalPop', false);
+ 
+-      if (_reactNative.Platform.OS === 'android') {
++      if (_reactNative.Platform.OS !== 'ios') {
+         _reactNative.BackHandler.removeEventListener('hardwareBackPress', this._onBack);
+       }
+ 
+@@ -258,7 +259,7 @@ var NavigatorLayout = function (_Component) {
+       if (_reactNative.Platform.OS === 'harmony' && this.cancelChangeListener) {
+         typeof this.cancelChangeListener.remove === 'function' && this.cancelChangeListener.remove();
+       } else {
+-        _reactNative.AppState.removeEventListener('change', this._handleAppStateChange);
++        appStateRes_change_132252343 && appStateRes_change_132252343.remove();;
+       }
+     }
+   }, {
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/ble-offline-view/ble-toast.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/ble-offline-view/ble-toast.js
+index d70eb88..3116b38 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/ble-offline-view/ble-toast.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/ble-offline-view/ble-toast.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -63,7 +65,7 @@ var BleToast = function BleToast(_ref) {
+ };
+ 
+ BleToast.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+   text: _propTypes2.default.string.isRequired,
+   image: _propTypes2.default.number.isRequired,
+   onPress: _propTypes2.default.func
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/index.js
+index 5d9bf25..a322dbc 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -314,8 +316,8 @@ var OfflineView = function (_Component) {
+ }(_react.Component);
+ 
+ OfflineView.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
+-  textStyle: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
++  textStyle: _reactNativeCommunity_18482815172['default'].style,
+   text: _propTypes2.default.string,
+   appOnline: _propTypes2.default.bool,
+   deviceOnline: _propTypes2.default.bool,
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/new-offline-view.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/new-offline-view.js
+index 6ef6eeb..be91ff4 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/new-offline-view.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/new-offline-view.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -107,8 +109,8 @@ var NewOfflineView = function (_PureComponent) {
+       this.show();
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (this.props.show !== nextProps.show) {
+         this.setState({
+           show: nextProps.show
+@@ -328,8 +330,8 @@ var NewOfflineView = function (_PureComponent) {
+ NewOfflineView.propTypes = {
+   maskColor: _reactNative.ColorPropType,
+   onClose: _propTypes2.default.func,
+-  style: _reactNative.ViewPropTypes.style,
+-  animatedStyle: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
++  animatedStyle: _reactNativeCommunity_18482815172['default'].style,
+   showDeviceImg: _propTypes2.default.bool,
+   show: _propTypes2.default.bool,
+   onLinkPress: _propTypes2.default.func,
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/webview.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/webview.js
+index 6297f27..5971b60 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/webview.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/offline-view/webview.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -134,12 +136,12 @@ var OfflineWebView = function (_Component) {
+ 
+ OfflineWebView.propTypes = {
+   title: _propTypes2.default.string,
+-  topBarStyle: _reactNative.ViewPropTypes.style,
++  topBarStyle: _reactNativeCommunity_18482815172['default'].style,
+   topbarTextStyle: _reactNative.Text.propTypes.style,
+   hideTopbar: _propTypes2.default.bool,
+   onBack: _propTypes2.default.func,
+   source: _propTypes2.default.string.isRequired,
+-  appStyle: _reactNative.ViewPropTypes.style,
++  appStyle: _reactNativeCommunity_18482815172['default'].style,
+   barStyle: _propTypes2.default.string
+ };
+ OfflineWebView.defaultProps = {
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/react-navigation/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/react-navigation/index.js
+index ab22ee0..28db747 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/react-navigation/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/react-navigation/index.js
+@@ -1,3 +1,4 @@
++let appStateRes_change_132252343;
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -410,7 +411,7 @@ function createNavigator(_ref) {
+     _createClass(Navigator, [{
+       key: 'componentDidMount',
+       value: function componentDidMount() {
+-        if (_reactNative.Platform.OS === 'android') {
++        if (_reactNative.Platform.OS !== 'ios') {
+           _reactNative.BackHandler.addEventListener('hardwareBackPress', this._onBack);
+         }
+         if (this.hideSignalPop) return;
+@@ -418,12 +419,12 @@ function createNavigator(_ref) {
+         _api2.default.receiverMqttData(23);
+         _api2.default.sendMqttData(22);
+         _TYNativeApi.TYSdk.DeviceEventEmitter.addListener('receiveMqttData', this._handleMqttSignal);
+-        this.cancelChangeListener = this.state.isMqttNoticeActive && _reactNative.AppState.addEventListener('change', this._handleAppStateChange);
++        this.cancelChangeListener = this.state.isMqttNoticeActive && (appStateRes_change_132252343 = _reactNative.AppState.addEventListener('change', this._handleAppStateChange));;
+       }
+     }, {
+       key: 'componentWillUnmount',
+       value: function componentWillUnmount() {
+-        if (_reactNative.Platform.OS === 'android') {
++        if (_reactNative.Platform.OS !== 'ios') {
+           _reactNative.BackHandler.removeEventListener('hardwareBackPress', this._onBack);
+         }
+         if (this.hideSignalPop) return;
+@@ -433,7 +434,7 @@ function createNavigator(_ref) {
+         if (_reactNative.Platform.OS === 'harmony' && this.cancelChangeListener) {
+           typeof this.cancelChangeListener.remove === 'function' && this.cancelChangeListener.remove();
+         } else {
+-          _reactNative.AppState.removeEventListener('change', this._handleAppStateChange);
++          appStateRes_change_132252343 && appStateRes_change_132252343.remove();;
+         }
+       }
+     }, {
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarAction.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarAction.js
+index a58e611..4986093 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarAction.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarAction.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -91,7 +93,7 @@ TopBarAction.displayName = 'TopBar.Action';
+ TopBarAction.width = _styled.TOPBAR_ACTION_WIDTH;
+ 
+ TopBarAction.propTypes = _extends({}, _iconfont2.default.propTypes, {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   contentStyle: _propTypes2.default.any,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarContainer.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarContainer.js
+index d99c8b9..1cbf644 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarContainer.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarContainer.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -112,8 +114,8 @@ var TopBarContainer = function (_PureComponent) {
+   }
+ 
+   _createClass(TopBarContainer, [{
+-    key: 'componentWillUpdate',
+-    value: function componentWillUpdate() {
++    key: 'UNSAFE_componentWillUpdate',
++    value: function UNSAFE_componentWillUpdate() {
+       this.hasContent = false;
+       this.leftItemWidth = 0;
+       this.rightItemWidth = 0;
+@@ -203,9 +205,9 @@ var TopBarContainer = function (_PureComponent) {
+ 
+ TopBarContainer.displayName = 'TopBar.Container';
+ TopBarContainer.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   background: _propTypes2.default.oneOfType([_propTypes2.default.string, _propTypes2.default.object]),
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarContent.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarContent.js
+index fc05fa1..aa36d40 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarContent.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/layout/topbar/TopBarContent.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -74,7 +76,7 @@ var TopBarContent = function TopBarContent(_ref) {
+ TopBarContent.displayName = 'TopBar.Content';
+ 
+ TopBarContent.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   color: _propTypes2.default.string,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/TYModal.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/TYModal.js
+index 71e7abf..1fc73c1 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/TYModal.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/TYModal.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -78,7 +80,8 @@ var TYModal = function (_React$Component) {
+     value: function componentDidMount() {
+       _reactNative.Animated.timing(this.state.fade, {
+         duration: 200,
+-        toValue: 1
++        toValue: 1,
++        useNativeDriver: false
+       }).start();
+     }
+   }, {
+@@ -103,9 +106,9 @@ TYModal.propTypes = {
+ 
+   onMaskPress: _propTypes2.default.func,
+ 
+-  modalChildStyle: _reactNative.ViewPropTypes.style,
++  modalChildStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  maskStyle: _reactNative.ViewPropTypes.style,
++  maskStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   mask: _propTypes2.default.bool,
+ 
+@@ -198,7 +201,7 @@ var _initialiseProps = function _initialiseProps() {
+       }),
+       children.map(function (child, idx) {
+         var childStyle = [maskContainer, onlyLastModalVisible && { display: idx === activeIdx ? 'flex' : 'none' }, {
+-          position: _reactNative.Platform.OS === 'android' && idx !== activeIdx ? 'relative' : 'absolute'
++          position: _reactNative.Platform.OS !== 'ios' && idx !== activeIdx ? 'relative' : 'absolute'
+         }];
+         var modalChild = child;
+         if (!Array.isArray(child)) {
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/portal.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/portal.js
+index 868c11b..f1070f2 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/portal.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/portal.js
+@@ -64,8 +64,8 @@ var Portal = function (_React$Component) {
+       }
+     }
+   }, {
+-    key: 'componentWillUpdate',
+-    value: function componentWillUpdate(nextProps) {
++    key: 'UNSAFE_componentWillUpdate',
++    value: function UNSAFE_componentWillUpdate(nextProps) {
+       this.registerPortal(nextProps, true);
+       if (nextProps.visible === this.props.visible) return;
+       if (nextProps.visible) {
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/portalOut.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/portalOut.js
+index 6ebbc04..91fb26d 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/portalOut.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/modal/portalOut.js
+@@ -142,7 +142,7 @@ var _initialiseProps = function _initialiseProps() {
+     if (show) onShow && onShow();
+     if (!show) {
+       if (isDismiss) {
+-        _reactNative.Platform.OS === 'android' && typeof onDismiss === 'function' && onDismiss();
++        _reactNative.Platform.OS !== 'ios' && typeof onDismiss === 'function' && onDismiss();
+       } else {
+         typeof onHide === 'function' && onHide();
+       }
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/fade.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/fade.js
+index e359697..43bb2d4 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/fade.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/fade.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -109,8 +111,8 @@ var Fade = function (_PureComponent) {
+       }
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       var show = nextProps.show;
+ 
+       if (typeof show !== 'undefined' && show !== this.state.show) {
+@@ -152,7 +154,7 @@ var Fade = function (_PureComponent) {
+ 
+ Fade.displayName = 'Motion.Fade';
+ Fade.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   show: _propTypes2.default.bool,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/pull-up.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/pull-up.js
+index 8c6b7cd..8297d3a 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/pull-up.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/pull-up.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -109,8 +111,8 @@ var PullUp = function (_PureComponent) {
+       }
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (typeof this.state.measuredHeight !== 'number') {
+         return;
+       }
+@@ -173,7 +175,7 @@ var PullUp = function (_PureComponent) {
+ 
+ PullUp.displayName = 'Motion.PullUp';
+ PullUp.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   show: _propTypes2.default.bool,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/push-down.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/push-down.js
+index eb343da..8683c33 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/push-down.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/push-down.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -108,8 +110,8 @@ var PushDown = function (_PureComponent) {
+       }
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       var show = nextProps.show;
+ 
+       if (typeof show !== 'undefined' && show !== this.state.show) {
+@@ -165,7 +167,7 @@ PushDown.displayName = 'Motion.PushDown';
+ PushDown.propTypes = {
+   accessibilityLabel: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   show: _propTypes2.default.bool,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/scale-fade-in.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/scale-fade-in.js
+index ed9318f..b762c3f 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/scale-fade-in.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/scale-fade-in.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -142,8 +144,8 @@ var ScaleFadeIn = function (_PureComponent) {
+       }
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       var show = nextProps.show,
+           width = nextProps.width,
+           height = nextProps.height;
+@@ -214,7 +216,7 @@ var ScaleFadeIn = function (_PureComponent) {
+ 
+ ScaleFadeIn.displayName = 'Motion.ScaleFadeIn';
+ ScaleFadeIn.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   show: _propTypes2.default.bool,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/scale-pull-down.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/scale-pull-down.js
+index 7b8db2a..8f6361f 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/scale-pull-down.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/scale-pull-down.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -128,8 +130,8 @@ var ScalePullDown = function (_PureComponent) {
+       }
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       var show = nextProps.show;
+ 
+       if (typeof show !== 'undefined' && show !== this.state.show) {
+@@ -190,7 +192,7 @@ var ScalePullDown = function (_PureComponent) {
+ 
+ ScalePullDown.displayName = 'Motion.ScalePullDown';
+ ScalePullDown.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   show: _propTypes2.default.bool,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/toast.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/toast.js
+index e0c149a..e779173 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/toast.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/motion/toast.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -101,8 +103,8 @@ var MotionToast = function (_PureComponent) {
+   }
+ 
+   _createClass(MotionToast, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       var show = nextProps.show;
+ 
+       if (typeof show !== 'undefined' && show !== this.state.show) {
+@@ -148,7 +150,7 @@ var MotionToast = function (_PureComponent) {
+ }(_react.PureComponent);
+ 
+ MotionToast.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   initScale: _propTypes2.default.number,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/notification-legacy/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/notification-legacy/index.js
+index 573ed1f..9a80f81 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/notification-legacy/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/notification-legacy/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -262,7 +264,7 @@ exports.default = NotificationLegacy;
+ NotificationLegacy.propTypes = {
+   accessibilityLabel: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   theme: _propTypes2.default.shape({
+     background: _reactNative.ColorPropType,
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/notification/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/notification/index.js
+index 8b06130..5613138 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/notification/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/notification/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -109,8 +111,8 @@ var Notification = function (_PureComponent) {
+       }
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       var enableClose = nextProps.enableClose,
+           autoCloseTime = nextProps.autoCloseTime,
+           onClose = nextProps.onClose,
+@@ -275,7 +277,7 @@ exports.default = Notification;
+ Notification.propTypes = {
+   accessibilityLabel: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   theme: _propTypes2.default.shape({
+     background: _reactNative.ColorPropType,
+@@ -308,13 +310,13 @@ Notification.propTypes = {
+ 
+   motionConfig: _propTypes2.default.object,
+ 
+-  motionStyle: _reactNative.ViewPropTypes.style,
++  motionStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   onPress: _propTypes2.default.func,
+ 
+   imageSource: _propTypes2.default.number,
+ 
+-  imageStyle: _reactNative.ViewPropTypes.style,
++  imageStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   backIconSize: _propTypes2.default.number,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/TYRCTPicker.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/TYRCTPicker.js
+index fcba4f2..2ba5fec 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/TYRCTPicker.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/TYRCTPicker.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -81,8 +83,8 @@ var PickerView = exports.PickerView = function (_Component) {
+   }
+ 
+   _createClass(PickerView, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       this.setState(this._stateFromProps(nextProps));
+     }
+   }, {
+@@ -142,7 +144,7 @@ PickerView.propTypes = {
+ 
+   loop: _propTypes2.default.bool,
+ 
+-  style: _reactNative.ViewPropTypes.style
++  style: _reactNativeCommunity_18482815172['default'].style
+ };
+ PickerView.defaultProps = {
+   accessibilityLabel: 'PickerView',
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.android.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.android.js
+index 38ac629..970ff50 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.android.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.android.js
+@@ -81,8 +81,8 @@ var PickerView = exports.PickerView = function (_Component2) {
+   }
+ 
+   _createClass(PickerView, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       this.setState(this.stateFromProps(nextProps));
+     }
+   }, {
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.harmony.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.harmony.js
+index 07b6ea4..4499b90 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.harmony.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.harmony.js
+@@ -81,8 +81,8 @@ var PickerView = exports.PickerView = function (_Component2) {
+   }
+ 
+   _createClass(PickerView, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       this.setState(this.stateFromProps(nextProps));
+     }
+   }, {
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.ios.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.ios.js
+index b0ac9d4..9db5357 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.ios.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.ios.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('@react-native-picker/picker');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -67,8 +69,8 @@ var PickerView = exports.PickerView = function (_PureComponent) {
+   }
+ 
+   _createClass(PickerView, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (this.props.selectedValue !== nextProps.selectedValue) {
+         this.setState({ selectedValue: nextProps.selectedValue });
+       }
+@@ -113,7 +115,7 @@ var PickerView = exports.PickerView = function (_PureComponent) {
+   return PickerView;
+ }(_react.PureComponent);
+ 
+-PickerView.propTypes = _extends({}, _reactNative.PickerIOS.propTypes, _TYRCTPicker2.default.propTypes, {
++PickerView.propTypes = _extends({}, _reactNativeCommunity_18482815172['default'].propTypes, _TYRCTPicker2.default.propTypes, {
+   loop: _propTypes2.default.bool,
+ 
+   children: _propTypes2.default.array.isRequired
+@@ -150,7 +152,7 @@ var _initialiseProps = function _initialiseProps() {
+   };
+ };
+ 
+-PickerView.Item = _reactNative.PickerIOS.Item;
++PickerView.Item = _reactNativeCommunity_18482815172['default'].Item;
+ 
+ var ThemedPickerView = function ThemedPickerView(props) {
+   var localTheme = props.theme,
+@@ -194,7 +196,7 @@ var ThemedPickerView = function ThemedPickerView(props) {
+   );
+ };
+ 
+-ThemedPickerView.Item = _reactNative.PickerIOS.Item;
++ThemedPickerView.Item = _reactNativeCommunity_18482815172['default'].Item;
+ 
+ ThemedPickerView.propTypes = {
+   theme: _propTypes2.default.shape({
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.web.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.web.js
+index 2037475..0ced069 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.web.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/index.web.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('@react-native-picker/picker');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -63,8 +65,8 @@ var PickerView = exports.PickerView = function (_PureComponent) {
+   }
+ 
+   _createClass(PickerView, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (this.props.selectedValue !== nextProps.selectedValue) {
+         this.setState({ selectedValue: nextProps.selectedValue });
+       }
+@@ -109,7 +111,7 @@ var PickerView = exports.PickerView = function (_PureComponent) {
+   return PickerView;
+ }(_react.PureComponent);
+ 
+-PickerView.propTypes = _extends({}, _reactNative.Picker.propTypes, {
++PickerView.propTypes = _extends({}, _reactNativeCommunity_18482815172['default'].propTypes, {
+   loop: _propTypes2.default.bool,
+   children: _propTypes2.default.array.isRequired
+ });
+@@ -145,7 +147,7 @@ var _initialiseProps = function _initialiseProps() {
+   };
+ };
+ 
+-PickerView.Item = _reactNative.Picker.Item;
++PickerView.Item = _reactNativeCommunity_18482815172['default'].Item;
+ 
+ var ThemedPickerView = function ThemedPickerView(props) {
+   var localTheme = props.theme,
+@@ -178,7 +180,7 @@ var ThemedPickerView = function ThemedPickerView(props) {
+   );
+ };
+ 
+-ThemedPickerView.Item = _reactNative.Picker.Item;
++ThemedPickerView.Item = _reactNativeCommunity_18482815172['default'].Item;
+ 
+ ThemedPickerView.propTypes = {
+   theme: _propTypes2.default.shape({
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/picker/index.ios.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/picker/index.ios.js
+index 97d9d92..36f6d70 100755
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/picker/index.ios.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/picker-view/picker/index.ios.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -121,7 +123,7 @@ TYRCTNewPicker.propTypes = {
+ 
+   onChange: _propTypes2.default.func,
+ 
+-  style: _reactNative.ViewPropTypes.style
++  style: _reactNativeCommunity_18482815172['default'].style
+ };
+ TYRCTNewPicker.defaultProps = {
+   items: [],
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/countdown.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/countdown.js
+index 206e1ba..9e035c9 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/countdown.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/countdown.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -121,8 +123,8 @@ var CountdownPopup = function (_React$Component) {
+   }
+ 
+   _createClass(CountdownPopup, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (this.props.value !== nextProps.value) {
+         this.setState({
+           hour: this.getHour(nextProps),
+@@ -427,7 +429,7 @@ var CountdownPopup = function (_React$Component) {
+ }(_react2.default.Component);
+ 
+ CountdownPopup.propTypes = _extends({}, _pickerView2.default.PropTypes, {
+-  countdownWrapperStyle: _reactNative.ViewPropTypes.style,
++  countdownWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   switchValue: _propTypes2.default.bool.isRequired,
+ 
+@@ -453,11 +455,11 @@ CountdownPopup.propTypes = _extends({}, _pickerView2.default.PropTypes, {
+ 
+   _onDataChange: _propTypes2.default.func,
+ 
+-  hourPickerStyle: _reactNative.ViewPropTypes.style,
++  hourPickerStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   hourUnitStyle: _reactNative.Text.propTypes.style,
+ 
+-  minutePickerStyle: _reactNative.ViewPropTypes.style,
++  minutePickerStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   minuteUnitStyle: _reactNative.Text.propTypes.style
+ });
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/dropdown/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/dropdown/index.js
+index 7f9ba40..527e973 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/dropdown/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/dropdown/index.js
+@@ -45,8 +45,8 @@ var Select = function (_Component) {
+   }
+ 
+   _createClass(Select, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (nextProps.data !== this.props.data) {
+         if (nextProps.data.imageRes) {
+           this.setState({
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/list.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/list.js
+index a419235..86c365d 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/list.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/list.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -74,8 +76,8 @@ var ListPopup = function (_React$Component) {
+   }
+ 
+   _createClass(ListPopup, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (this.state.selected === nextProps.value || this.props.value === nextProps.value) return;
+ 
+       var _calcSelected = this.calcSelected(nextProps),
+@@ -134,7 +136,7 @@ var ListPopup = function (_React$Component) {
+ ListPopup.propTypes = _extends({}, _reactNative.FlatList.propTypes, {
+   switchValue: _propTypes2.default.bool.isRequired,
+ 
+-  listWrapperStyle: _reactNative.ViewPropTypes.style,
++  listWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   dataSource: _propTypes2.default.arrayOf(_propTypes2.default.shape({
+     styles: _propTypes2.default.object,
+@@ -155,13 +157,13 @@ ListPopup.propTypes = _extends({}, _reactNative.FlatList.propTypes, {
+ 
+   value: _propTypes2.default.oneOfType([_propTypes2.default.string, _propTypes2.default.number, _propTypes2.default.array]),
+ 
+-  listItemStyle: _reactNative.ViewPropTypes.style,
++  listItemStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   onSelect: _propTypes2.default.func,
+ 
+   _onDataChange: _propTypes2.default.func,
+ 
+-  switchStyle: _reactNative.ViewPropTypes.style,
++  switchStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   checkIconColor: _propTypes2.default.string
+ });
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/number-selector.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/number-selector.js
+index 4c2df70..f797ccb 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/number-selector.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/number-selector.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -150,8 +152,8 @@ var NumberSelectorPopup = function (_Component) {
+   }
+ 
+   _createClass(NumberSelectorPopup, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (this.props.value !== nextProps.value) {
+         this.setState({ value: +nextProps.value });
+       }
+@@ -338,7 +340,7 @@ var NumberSelectorPopup = function (_Component) {
+ }(_react.Component);
+ 
+ NumberSelectorPopup.propTypes = {
+-  numberSelectorWrapperStyle: _reactNative.ViewPropTypes.style,
++  numberSelectorWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   switchValue: _propTypes2.default.bool.isRequired,
+ 
+@@ -362,7 +364,7 @@ NumberSelectorPopup.propTypes = {
+ 
+   isValueChangeUniform: _propTypes2.default.bool,
+ 
+-  valueStyle: _reactNative.ViewPropTypes.style
++  valueStyle: _reactNativeCommunity_18482815172['default'].style
+ };
+ NumberSelectorPopup.defaultProps = {
+   numberSelectorWrapperStyle: null,
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/picker.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/picker.js
+index 76e04f8..b5ef1a5 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/picker.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/picker.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -113,9 +115,9 @@ PickerPopup.propTypes = {
+ 
+   labelOffset: _propTypes2.default.number,
+ 
+-  pickerWrapperStyle: _reactNative.ViewPropTypes.style,
++  pickerWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  pickerStyle: _reactNative.ViewPropTypes.style,
++  pickerStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   value: _propTypes2.default.oneOfType([_propTypes2.default.string, _propTypes2.default.number, _propTypes2.default.bool, _propTypes2.default.array]),
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/withSkeleton.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/withSkeleton.js
+index c676a01..81788ff 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/withSkeleton.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/popup/withSkeleton.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -380,8 +382,8 @@ var withSkeleton = function withSkeleton(WrappedComponent) {
+     }
+ 
+     _createClass(WrapperComponent, [{
+-      key: 'componentWillReceiveProps',
+-      value: function componentWillReceiveProps(nextProps) {
++      key: 'UNSAFE_componentWillReceiveProps',
++      value: function UNSAFE_componentWillReceiveProps(nextProps) {
+         if (this.props.visible !== nextProps.visible) {
+           this.setState({ show: nextProps.visible });
+         }
+@@ -504,7 +506,7 @@ var withSkeleton = function withSkeleton(WrappedComponent) {
+ 
+     return WrapperComponent;
+   }(_react2.default.Component), _class.propTypes = _extends({}, _TYModal2.default.propTypes, {
+-    wrapperStyle: _reactNative.ViewPropTypes.style,
++    wrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+     title: _propTypes2.default.oneOfType([_propTypes2.default.arrayOf(_propTypes2.default.string), _propTypes2.default.string, _propTypes2.default.element]),
+ 
+@@ -512,7 +514,7 @@ var withSkeleton = function withSkeleton(WrappedComponent) {
+ 
+     titleTextStyle: _TYText2.default.propTypes.style,
+ 
+-    titleWrapperStyle: _reactNative.ViewPropTypes.style,
++    titleWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+     switchValue: _propTypes2.default.bool,
+ 
+@@ -532,7 +534,7 @@ var withSkeleton = function withSkeleton(WrappedComponent) {
+ 
+     footer: _propTypes2.default.element,
+ 
+-    footerWrapperStyle: _reactNative.ViewPropTypes.style,
++    footerWrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+     footerType: _propTypes2.default.oneOf(['singleConfirm', 'singleCancel', 'custom', 'both']),
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/gradient.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/gradient.js
+index 44dbc79..2e322d2 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/gradient.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/gradient.js
+@@ -71,7 +71,15 @@ var Gradient = function (_PureComponent) {
+           __source: {
+             fileName: _jsxFileName,
+             lineNumber: 44
+-          }
++          },
++
++          key: JSON.stringify({
++            gradientId: gradientId,
++            x1: x1,
++            x2: x2,
++            y1: y1,
++            y2: y2
++          })
+         },
+         _react2.default.createElement(
+           _reactNativeSvg.LinearGradient,
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-compose.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-compose.js
+index bbf9ace..3e9b49d 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-compose.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-compose.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -74,8 +76,8 @@ var ProgressSimple = function (_Gesture) {
+   }
+ 
+   _createClass(ProgressSimple, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       this.fixDegreeAndBindToInstance(nextProps);
+       if (this.state.value1 !== nextProps.value1) {
+         this.setState({
+@@ -643,7 +645,7 @@ var ProgressSimple = function (_Gesture) {
+ }(_gesture2.default);
+ 
+ ProgressSimple.propTypes = _extends({}, _gesture2.default.propTypes, {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   value1: _propTypes2.default.number,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-double.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-double.js
+index 0bf9e4c..628ece3 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-double.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-double.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -76,8 +78,8 @@ var ProgressDouble = function (_Gesture) {
+   }
+ 
+   _createClass(ProgressDouble, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       this.fixDegreeAndBindToInstance(nextProps);
+       if (this.state.minValue !== nextProps.minValue) {
+         this.setState({
+@@ -652,7 +654,7 @@ var ProgressDouble = function (_Gesture) {
+ ProgressDouble.propTypes = _extends({}, _gesture2.default.propTypes, {
+   gradientId: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   maxValue: _propTypes2.default.number,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-space.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-space.js
+index a670f19..2e0310e 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-space.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress-space.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -58,8 +60,8 @@ var ProgressSpace = function (_Gesture) {
+   }
+ 
+   _createClass(ProgressSpace, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       this.fixDegreeAndBindToInstance(nextProps);
+       if (this.state.value !== nextProps.value) {
+         this.setState({
+@@ -416,7 +418,7 @@ var ProgressSpace = function (_Gesture) {
+ ProgressSpace.propTypes = _extends({}, _gesture2.default.propTypes, {
+   gradientId: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   value: _propTypes2.default.number,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress.js
+index 43bf204..efa09f2 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/progress/progress.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -75,8 +77,8 @@ var Progress = function (_Gesture) {
+   }
+ 
+   _createClass(Progress, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       this.fixDegreeAndBindToInstance(nextProps);
+       if (this.state.value !== nextProps.value) {
+         this.setState({
+@@ -524,7 +526,7 @@ var Progress = function (_Gesture) {
+ Progress.propTypes = _extends({}, _gesture2.default.propTypes, {
+   gradientId: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   value: _propTypes2.default.number,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/rotation-view/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/rotation-view/index.js
+index aca13fd..85f9464 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/rotation-view/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/rotation-view/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -48,8 +50,8 @@ var RotationView = function (_Component) {
+       this.startAnimation();
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       var _this2 = this;
+ 
+       var active = nextProps.active;
+@@ -137,7 +139,7 @@ var RotationView = function (_Component) {
+ RotationView.propTypes = {
+   accessibilityLabel: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   children: _propTypes2.default.node,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider-progress/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider-progress/index.js
+index e8c2f8a..d9edd0f 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider-progress/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider-progress/index.js
+@@ -70,8 +70,8 @@ var SliderProgress = function (_Component) {
+   }
+ 
+   _createClass(SliderProgress, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (nextProps.value !== this.props.value) {
+         if (this.isSingle) {
+           this.setState({ maxValue: nextProps.value });
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider-with-line/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider-with-line/index.js
+index c5f66df..ca1351a 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider-with-line/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider-with-line/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -206,8 +208,8 @@ var SliderWithLine = function (_React$Component) {
+   }
+ 
+   _createClass(SliderWithLine, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (this.moving) return;
+       this.initSliderPosition(nextProps);
+     }
+@@ -438,7 +440,7 @@ SliderWithLine.propTypes = {
+ 
+   onSlidingComplete: _propTypes2.default.func,
+ 
+-  style: _reactNative.ViewPropTypes.style
++  style: _reactNativeCommunity_18482815172['default'].style
+ };
+ SliderWithLine.defaultProps = {
+   maxValue: 50,
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider/slider.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider/slider.js
+index 4740bf3..b1b0a66 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider/slider.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/slider/slider.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -303,8 +305,8 @@ var Slider = function (_Component) {
+   }
+ 
+   _createClass(Slider, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (this.props.value !== nextProps.value && !this.touchLocked) {
+         var newValue = this._testValue(nextProps.value, nextProps);
+         this.oldValue = newValue;
+@@ -875,11 +877,11 @@ Slider.propTypes = {
+   onSlidingComplete: _propTypes2.default.func,
+   onScrollEvent: _propTypes2.default.func,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  trackStyle: _reactNative.ViewPropTypes.style,
++  trackStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  thumbStyle: _reactNative.ViewPropTypes.style,
++  thumbStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   debugTouchArea: _propTypes2.default.bool,
+ 
+@@ -905,9 +907,9 @@ Slider.propTypes = {
+ 
+   useNoun: _propTypes2.default.bool,
+ 
+-  maxNounStyle: _reactNative.ViewPropTypes.style,
++  maxNounStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  minNounStyle: _reactNative.ViewPropTypes.style
++  minNounStyle: _reactNativeCommunity_18482815172['default'].style
+ };
+ Slider.defaultProps = {
+   accessibilityLabel: 'Slider',
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/stepper/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/stepper/index.js
+index 56eb125..9a422b9 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/stepper/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/stepper/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -319,8 +321,8 @@ var Stepper = function (_PureComponent) {
+       getTextInputRef && getTextInputRef(this.TextInputRef);
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (this.props.value !== nextProps.value) {
+         this.setState({
+           value: nextProps.value
+@@ -363,11 +365,11 @@ var Stepper = function (_PureComponent) {
+ }(_react.PureComponent);
+ 
+ Stepper.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  inputStyle: _reactNative.ViewPropTypes.style,
++  inputStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  buttonStyle: _reactNative.ViewPropTypes.style,
++  buttonStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   editable: _propTypes2.default.bool,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/swipeout/swipeout.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/swipeout/swipeout.js
+index 4db48b3..53c1d3e 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/swipeout/swipeout.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/swipeout/swipeout.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -132,7 +134,8 @@ var Swipeout = function (_React$Component) {
+         duration: duration,
+         easing: _reactNative.Easing.linear,
+         delay: 0,
+-        toValue: contentDot
++        toValue: contentDot,
++        useNativeDriver: false
+       }).start(function () {
+         _this.setState({
+           openedLeft: left,
+@@ -159,7 +162,8 @@ var Swipeout = function (_React$Component) {
+         duration: 160,
+         easing: _reactNative.Easing.linear,
+         delay: 0,
+-        toValue: 0
++        toValue: 0,
++        useNativeDriver: false
+       }).start(function () {
+         _this.setState({
+           openedRight: false,
+@@ -335,8 +339,8 @@ var Swipeout = function (_React$Component) {
+   }
+ 
+   _createClass(Swipeout, [{
+-    key: 'componentWillMount',
+-    value: function componentWillMount() {
++    key: 'UNSAFE_componentWillMount',
++    value: function UNSAFE_componentWillMount() {
+       var _this2 = this;
+ 
+       this.panResponder = _reactNative.PanResponder.create({
+@@ -367,8 +371,8 @@ var Swipeout = function (_React$Component) {
+       });
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (nextProps.close) this.onHide();
+     }
+   }, {
+@@ -468,7 +472,7 @@ Swipeout.propTypes = {
+ 
+   onScrollEnd: _propTypes2.default.func,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   close: _propTypes2.default.bool
+ };
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/switch-button/switch-button.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/switch-button/switch-button.js
+index d862d9a..e2a5c3b 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/switch-button/switch-button.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/switch-button/switch-button.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -80,8 +82,8 @@ var SwitchButton = function (_React$PureComponent) {
+   }
+ 
+   _createClass(SwitchButton, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (!('value' in nextProps) || this.value === nextProps.value) return;
+       this.valueChange(nextProps.value);
+     }
+@@ -320,7 +322,7 @@ var SwitchButton = function (_React$PureComponent) {
+ SwitchButton.propTypes = {
+   accessibilityLabel: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   disabled: _propTypes2.default.bool,
+ 
+@@ -342,7 +344,7 @@ SwitchButton.propTypes = {
+ 
+   borderColor: _propTypes2.default.string,
+ 
+-  thumbStyle: _reactNative.ViewPropTypes.style,
++  thumbStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   useNativeDriver: _propTypes2.default.bool,
+ 
+@@ -362,7 +364,7 @@ SwitchButton.propTypes = {
+ 
+   switchType: _propTypes2.default.oneOfType([_propTypes2.default.oneOf(['thumbMore']), _propTypes2.default.string]),
+ 
+-  smallThumbStyle: _reactNative.ViewPropTypes.style
++  smallThumbStyle: _reactNativeCommunity_18482815172['default'].style
+ };
+ SwitchButton.defaultProps = {
+   accessibilityLabel: 'SwitchButton',
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabContent.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabContent.js
+index 837ab87..e90ecf9 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabContent.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabContent.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -64,8 +66,8 @@ var TabContent = function (_React$Component) {
+       });
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (this.props.activeKey !== nextProps.activeKey && nextProps.activeKey !== undefined) {
+         this.goToTab(_utils2.default.getActiveIndex(nextProps.panels, nextProps.activeKey), true);
+       }
+@@ -85,7 +87,7 @@ var TabContent = function (_React$Component) {
+           style = _props.style,
+           useViewPagerOnAndroid = _props.useViewPagerOnAndroid;
+ 
+-      if (_reactNative.Platform.OS === 'android' && useViewPagerOnAndroid) {
++      if (_reactNative.Platform.OS !== 'ios' && useViewPagerOnAndroid) {
+         return _react2.default.createElement(
+           _reactNative.ViewPagerAndroid,
+           {
+@@ -165,7 +167,7 @@ TabContent.propTypes = {
+ 
+   useViewPagerOnAndroid: _propTypes2.default.bool,
+ 
+-  style: _reactNative.ViewPropTypes.style
++  style: _reactNativeCommunity_18482815172['default'].style
+ };
+ 
+ var _initialiseProps = function _initialiseProps() {
+@@ -173,7 +175,7 @@ var _initialiseProps = function _initialiseProps() {
+ 
+   this.onScroll = function (e) {
+     if (e) {
+-      if (_reactNative.Platform.OS === 'android') {
++      if (_reactNative.Platform.OS !== 'ios') {
+         var _e$nativeEvent = e.nativeEvent,
+             position = _e$nativeEvent.position,
+             offset = _e$nativeEvent.offset;
+@@ -273,7 +275,7 @@ var _initialiseProps = function _initialiseProps() {
+   this.scrollTo = function (index) {
+     var animated = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
+ 
+-    if (_reactNative.Platform.OS === 'android' && _this4.props.useViewPagerOnAndroid) {
++    if (_reactNative.Platform.OS !== 'ios' && _this4.props.useViewPagerOnAndroid) {
+       if (_this4.viewPager) {
+         if (animated) {
+           _this4.viewPager.setPage(index);
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabNav.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabNav.js
+index 9c8e97c..8951f86 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabNav.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabNav.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -174,7 +176,7 @@ var TabBar = function (_React$Component) {
+ 
+       newScrollX -= (containerWidth - (1 - offset) * tabWidth - offset * nextTabWidth) / 2;
+       newScrollX = newScrollX >= 0 ? newScrollX : 0;
+-      if (_reactNative.Platform.OS === 'android') {
++      if (_reactNative.Platform.OS !== 'ios') {
+         _this.scrollView && _this.scrollView.scrollTo({ x: newScrollX, y: 0, animated: true });
+       } else {
+         var rightBoundScroll = Math.max(_this._tabContainerLayout.width - _this._containerLayout.width, 0);
+@@ -318,13 +320,13 @@ TabBar.propTypes = {
+ 
+   tabActiveTextStyle: _reactNative.Text.propTypes.style,
+ 
+-  tabStyle: _reactNative.ViewPropTypes.style,
++  tabStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  tabBarUnderlineStyle: _reactNative.ViewPropTypes.style,
++  tabBarUnderlineStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  tabBarStyle: _reactNative.ViewPropTypes.style,
++  tabBarStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  tabsContainerStyle: _reactNative.ViewPropTypes.style,
++  tabsContainerStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   tabBarPosition: _propTypes2.default.oneOf(['top', 'bottom'])
+ };
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabs.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabs.js
+index 8055bcb..0b4003d 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabs.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tab/tabs.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -66,8 +68,8 @@ var Tabs = function (_React$Component) {
+   }
+ 
+   _createClass(Tabs, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if ('activeKey' in nextProps) {
+         this.setState({
+           activeKey: nextProps.activeKey
+@@ -198,25 +200,25 @@ Tabs.propTypes = {
+ 
+   children: _propTypes2.default.oneOfType([_propTypes2.default.element, _propTypes2.default.array]),
+ 
+-  tabContentStyle: _reactNative.ViewPropTypes.style,
++  tabContentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   tabDefaultColor: _propTypes2.default.string,
+ 
+   tabBarBackgroundColor: _propTypes2.default.string,
+ 
+-  tabBarUnderlineStyle: _reactNative.ViewPropTypes.style,
++  tabBarUnderlineStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  tabBarStyle: _reactNative.ViewPropTypes.style,
++  tabBarStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   tabTextStyle: _reactNative.Text.propTypes.style,
+ 
+   tabActiveTextStyle: _reactNative.Text.propTypes.style,
+ 
+-  tabsContainerStyle: _reactNative.ViewPropTypes.style,
++  tabsContainerStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  tabStyle: _reactNative.ViewPropTypes.style,
++  tabStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   tabBarPosition: _propTypes2.default.oneOf(['top', 'bottom']),
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/default.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/default.js
+index be5d223..31eafba 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/default.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/default.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -196,11 +198,13 @@ var TabBar = function (_React$PureComponent) {
+       } else {
+         _this.underlineLeftAnimation = _reactNative.Animated.timing(_this.state.underlineLeft, {
+           toValue: left,
+-          duration: 200
++          duration: 200,
++          useNativeDriver: false
+         });
+         _this.underlineWidthAnimation = _reactNative.Animated.timing(_this.state.underlineWidth, {
+           toValue: width,
+-          duration: 200
++          duration: 200,
++          useNativeDriver: false
+         });
+         _this.underlineLeftAnimation.start();
+         _this.underlineWidthAnimation.start();
+@@ -254,8 +258,8 @@ var TabBar = function (_React$PureComponent) {
+   }
+ 
+   _createClass(TabBar, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       var _this2 = this;
+ 
+       if ('activeKey' in nextProps) {
+@@ -308,19 +312,19 @@ var TabBar = function (_React$PureComponent) {
+ }(_react2.default.PureComponent);
+ 
+ TabBar.propTypes = {
+-  underlineStyle: _reactNative.ViewPropTypes.style,
++  underlineStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  tabStyle: _reactNative.ViewPropTypes.style,
++  tabStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  tabActiveStyle: _reactNative.ViewPropTypes.style,
++  tabActiveStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   tabTextStyle: _reactNative.Text.propTypes.style,
+ 
+   tabActiveTextStyle: _reactNative.Text.propTypes.style,
+ 
+-  wrapperStyle: _reactNative.ViewPropTypes.style,
++  wrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   activeKey: _propTypes2.default.oneOfType([_propTypes2.default.string, _propTypes2.default.number]),
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/radio-button/group.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/radio-button/group.js
+index 725488f..90eb03f 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/radio-button/group.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/radio-button/group.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -103,7 +105,8 @@ var Group = function (_React$PureComponent) {
+ 
+       var currentLeft = index * _this.state.everyWidth + gutter;
+       _reactNative.Animated.spring(_this.state.activeLeft, {
+-        toValue: currentLeft
++        toValue: currentLeft,
++        useNativeDriver: false
+       }).start();
+       _this.setState({
+         activeIndex: index
+@@ -159,8 +162,8 @@ var Group = function (_React$PureComponent) {
+   }
+ 
+   _createClass(Group, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if ('activeIndex' in nextProps) {
+         this.moveActiveView(nextProps.activeIndex);
+       }
+@@ -213,8 +216,8 @@ var Group = function (_React$PureComponent) {
+ 
+ Group.propTypes = {
+   tabs: _propTypes2.default.array.isRequired,
+-  style: _reactNative.ViewPropTypes.style,
+-  wrapperStyle: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
++  wrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+   activeColor: _propTypes2.default.string,
+ 
+   activeIndex: _propTypes2.default.number,
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/radio-button/radioButton.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/radio-button/radioButton.js
+index 31fa775..fb451a3 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/radio-button/radioButton.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabbar/radio-button/radioButton.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -90,13 +92,13 @@ RadioButton.propTypes = {
+   accessibilityLabel: _propTypes2.default.string,
+   textAccessibilityLabel: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+   textStyle: _reactNative.Text.propTypes.style,
+   activeTextStyle: _reactNative.Text.propTypes.style,
+ 
+   onItemPress: _propTypes2.default.func.isRequired,
+   type: _propTypes2.default.oneOfType([_propTypes2.default.oneOf(['radio', 'radioCircle']), _propTypes2.default.string]),
+-  circleStyle: _reactNative.ViewPropTypes.style
++  circleStyle: _reactNativeCommunity_18482815172['default'].style
+ };
+ 
+ RadioButton.defaultProps = {
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/index.js
+index 50f9366..b106da9 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -114,8 +116,8 @@ var Tabs = function (_Component) {
+   }
+ 
+   _createClass(Tabs, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       var _this2 = this;
+ 
+       if (this._tabIsReady && typeof nextProps.activeKey !== 'undefined') {
+@@ -239,21 +241,21 @@ Tabs.TabScrollView = _tabScrollView2.default;
+ Tabs.propTypes = {
+   accessibilityLabel: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  wrapperStyle: _reactNative.ViewPropTypes.style,
++  wrapperStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  tabStyle: _reactNative.ViewPropTypes.style,
++  tabStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  tabActiveStyle: _reactNative.ViewPropTypes.style,
++  tabActiveStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   tabTextStyle: _TYText2.default.propTypes.style,
+ 
+   tabActiveTextStyle: _TYText2.default.propTypes.style,
+ 
+-  tabContentStyle: _reactNative.ViewPropTypes.style,
++  tabContentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  underlineStyle: _reactNative.ViewPropTypes.style,
++  underlineStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   underlineWidth: _propTypes2.default.number,
+ 
+@@ -454,7 +456,8 @@ var _initialiseProps = function _initialiseProps() {
+         });
+         _reactNative.Animated.decay(_this3.state.scrollX, {
+           velocity: vx,
+-          deceleration: _constant.DECELERATION
++          deceleration: _constant.DECELERATION,
++          useNativeDriver: false
+         }).start(function () {
+           _this3._curDeltaX = _this3.state.scrollX._value;
+           _this3.state.scrollX.removeAllListeners();
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/tab-content.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/tab-content.js
+index fd457c4..7b0d681 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/tab-content.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/tab-content.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -166,7 +168,7 @@ var TabContent = function (_Component) {
+ TabContent.propTypes = {
+   accessibilityLabel: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   activeIndex: _propTypes2.default.number.isRequired,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/tab-panel.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/tab-panel.js
+index 58944e5..42608de 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/tab-panel.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tabs/tab-panel.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -35,7 +37,7 @@ var TabPanel = function TabPanel(_ref) {
+ };
+ 
+ TabPanel.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   background: _reactNative.ColorPropType
+ };
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/timer-picker/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/timer-picker/index.js
+index 01bad9c..cd8645b 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/timer-picker/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/timer-picker/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -85,8 +87,8 @@ var TimerPicker = function (_Component) {
+   }
+ 
+   _createClass(TimerPicker, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (nextProps.startTime !== this.props.startTime || nextProps.endTime !== this.props.endTime) {
+         this.parseTimer(nextProps.startTime, nextProps.endTime);
+       }
+@@ -96,8 +98,8 @@ var TimerPicker = function (_Component) {
+       }
+     }
+   }, {
+-    key: 'componentWillUpdate',
+-    value: function componentWillUpdate(nextProps, nextState) {
++    key: 'UNSAFE_componentWillUpdate',
++    value: function UNSAFE_componentWillUpdate(nextProps, nextState) {
+       var onTimerChange = nextProps.onTimerChange;
+ 
+       if (nextState !== this.state) {
+@@ -244,7 +246,7 @@ var TimerPicker = function (_Component) {
+ TimerPicker.propTypes = {
+   accessibilityLabel: _propTypes2.default.string,
+ 
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   disabled: _propTypes2.default.bool,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tips/index.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tips/index.js
+index 496bb9c..e918e53 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tips/index.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/tips/index.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -88,8 +90,8 @@ var Tips = function (_PureComponent) {
+   }
+ 
+   _createClass(Tips, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (nextProps.show !== this.props.show) {
+         this.setState({
+           visible: nextProps.show
+@@ -301,9 +303,9 @@ var Tips = function (_PureComponent) {
+ }(_react.PureComponent);
+ 
+ Tips.propTypes = {
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  tipStyle: _reactNative.ViewPropTypes.style,
++  tipStyle: _reactNativeCommunity_18482815172['default'].style,
+   bgColor: _reactNative.ColorPropType,
+ 
+   show: _propTypes2.default.bool,
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/error.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/error.js
+index a7c15fc..1920757 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/error.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/error.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -102,9 +104,9 @@ Error.propTypes = {
+ 
+   d: _propTypes2.default.oneOfType([_propTypes2.default.string, _propTypes2.default.array]),
+ 
+-  iconfontStyle: _reactNative.ViewPropTypes.style,
++  iconfontStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   showPosition: _propTypes2.default.string,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/loading.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/loading.js
+index 8644497..5a31be6 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/loading.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/loading.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -94,7 +96,7 @@ var Loading = function (_React$PureComponent) {
+ }(_react2.default.PureComponent);
+ 
+ Loading.propTypes = {
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   color: _reactNative.ColorPropType,
+ 
+@@ -106,7 +108,7 @@ Loading.propTypes = {
+ 
+   strokeWidth: _propTypes2.default.number,
+ 
+-  loadingStyle: _reactNative.ViewPropTypes.style,
++  loadingStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   loadingBackgroundColor: _reactNative.ColorPropType
+ };
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/success.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/success.js
+index ee2ebae..57aeb95 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/success.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/success.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -102,9 +104,9 @@ Success.propTypes = {
+ 
+   d: _propTypes2.default.oneOfType([_propTypes2.default.string, _propTypes2.default.array]),
+ 
+-  iconfontStyle: _reactNative.ViewPropTypes.style,
++  iconfontStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   showPosition: _propTypes2.default.string,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/toast.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/toast.js
+index 5b45f78..f9e814d 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/toast.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/toast.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -40,7 +42,8 @@ var ToastView = function (_React$PureComponent) {
+       _reactNative.Animated.timing(_this.state.fadeValue, {
+         toValue: 1,
+         duration: 250,
+-        easing: _reactNative.Easing.linear
++        easing: _reactNative.Easing.linear,
++        useNativeDriver: false
+       }).start(function () {
+         return _this.timer();
+       });
+@@ -51,7 +54,8 @@ var ToastView = function (_React$PureComponent) {
+       _reactNative.Animated.timing(_this.state.fadeValue, {
+         toValue: 0,
+         duration: 250,
+-        easing: _reactNative.Easing.linear
++        easing: _reactNative.Easing.linear,
++        useNativeDriver: false
+       }).start();
+     };
+ 
+@@ -86,8 +90,8 @@ var ToastView = function (_React$PureComponent) {
+       }
+     }
+   }, {
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       var show = nextProps.show,
+           text = nextProps.text;
+ 
+@@ -171,9 +175,9 @@ var ToastView = function (_React$PureComponent) {
+ }(_react2.default.PureComponent);
+ 
+ ToastView.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   textStyle: _reactNative.Text.propTypes.style,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/warning.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/warning.js
+index 04810bc..3215227 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/warning.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/toast-view/warning.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -102,9 +104,9 @@ Warning.propTypes = {
+ 
+   d: _propTypes2.default.oneOfType([_propTypes2.default.string, _propTypes2.default.array]),
+ 
+-  iconfontStyle: _reactNative.ViewPropTypes.style,
++  iconfontStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+-  contentStyle: _reactNative.ViewPropTypes.style,
++  contentStyle: _reactNativeCommunity_18482815172['default'].style,
+ 
+   showPosition: _propTypes2.default.string,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/unit-text/unit-text-art.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/unit-text/unit-text-art.js
+index 399e59e..196fe01 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/unit-text/unit-text-art.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/unit-text/unit-text-art.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -61,8 +63,8 @@ var UnitTextART = function (_React$PureComponent) {
+   }
+ 
+   _createClass(UnitTextART, [{
+-    key: 'componentWillReceiveProps',
+-    value: function componentWillReceiveProps(nextProps) {
++    key: 'UNSAFE_componentWillReceiveProps',
++    value: function UNSAFE_componentWillReceiveProps(nextProps) {
+       if (nextProps.value !== this.state.value || nextProps.unit !== this.state.unit) {
+         this.setState({
+           value: nextProps.value,
+@@ -180,7 +182,7 @@ var UnitTextART = function (_React$PureComponent) {
+ }(_react2.default.PureComponent);
+ 
+ UnitTextART.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   size: _propTypes2.default.number,
+ 
+diff --git a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/unit-text/unit-text-svg.js b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/unit-text/unit-text-svg.js
+index 51eed7b..7488984 100644
+--- a/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/unit-text/unit-text-svg.js
++++ b/node_modules/@tuya-rn/tuya-panel-kit-harmony/lib/components/unit-text/unit-text-svg.js
+@@ -1,3 +1,5 @@
++var _reactNativeCommunity_1848281517 = require('deprecated-react-native-prop-types/DeprecatedViewPropTypes');
++var _reactNativeCommunity_18482815172 = _interopRequireDefault(_reactNativeCommunity_1848281517);
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+@@ -174,7 +176,7 @@ var UnitTextSvg = function (_React$PureComponent) {
+ }(_react2.default.PureComponent);
+ 
+ UnitTextSvg.propTypes = {
+-  style: _reactNative.ViewPropTypes.style,
++  style: _reactNativeCommunity_18482815172['default'].style,
+ 
+   size: _propTypes2.default.number,
+ 

@@ -19,9 +19,8 @@ import Szos from '../scenes/Szos';
 import Sensing from '../scenes/Sensing';
 
 import { traverseRouters } from '../utils';
-// // import OSCategory from '../scenes/OS';
-// import ThemeSetting from '../scenes/Theme';
-// import FullRoomCategory from '../scenes/FullRoom';
+
+// 硬编码包信息（避免 watchFolders 导致的 node_modules 冲突）
 const LampInfo = { name: '@tuya/tuya-panel-lamp-sdk', version: '1.14.1' };
 const RobotInfo = { name: '@tuya/tuya-panel-robot-sdk', version: '1.3.1' };
 const ApiSceneInfo = { name: '@tuya/tuya-panel-api', version: '1.12.0' };
@@ -45,12 +44,6 @@ const mainRouter = [
 
 export const elementsRouters = _.sortBy(
   [
-    // {
-    //   id: 'Basic',
-    //   title: BasicInfo.name,
-    //   subTitle: BasicInfo.version,
-    //   Scene: BasicCategory,
-    // },
     {
       id: 'Lock',
       title: LockInfo.name,
@@ -63,60 +56,24 @@ export const elementsRouters = _.sortBy(
       subTitle: LampInfo.version,
       Scene: LampCategory,
     },
-    // {
-    //   id: 'Standard',
-    //   title: StandardInfo.name,
-    //   subTitle: StandardInfo.version,
-    //   Scene: StandardCategory,
-    // },
     {
       id: 'SweepRobot',
       title: RobotInfo.name,
       subTitle: RobotInfo.version,
       Scene: SweepRobotCategory,
     },
-    // {
-    //   id: 'OS',
-    //   title: OSInfo.name,
-    //   subTitle: OSInfo.version,
-    //   Scene: OSCategory,
-    // },
-    // {
-    //   id: 'Sensor',
-    //   title: SensorInfo.name,
-    //   subTitle: SensorInfo.version,
-    //   Scene: SensorCategory,
-    // },
-    // {
-    //   id: 'Theme',
-    //   title: 'Theme',
-    //   value: '前往配置主题变量',
-    //   Scene: ThemeSetting,
-    // },
     {
       id: 'Health',
       title: HealthInfo.name,
       subTitle: HealthInfo.version,
       Scene: Health,
     },
-    // {
-    //   id: 'FullRoom',
-    //   title: FullRoomInfo.name,
-    //   subTitle: FullRoomInfo.version,
-    //   Scene: FullRoomCategory,
-    // },
     {
       id: 'Gateway',
       title: GatewayInfo.name,
       subTitle: GatewayInfo.version,
       Scene: GateWayCategory,
     },
-    // {
-    //   id: 'Cbt',
-    //   title: CbtInfo.name,
-    //   subTitle: CbtInfo.version,
-    //   Scene: CbtCategory,
-    // },
     {
       id: 'Animation',
       title: AnimationInfo.name,

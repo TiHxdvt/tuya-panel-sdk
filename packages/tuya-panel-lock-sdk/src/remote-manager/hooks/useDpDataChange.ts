@@ -1,6 +1,6 @@
 /* eslint-disable import/no-unresolved */
 import { useEffect, useState, useRef, useCallback } from 'react';
-import RCTDeviceEventEmitter from 'RCTDeviceEventEmitter';
+import { DeviceEventEmitter } from 'react-native';
 import moment from 'moment';
 import { TYSdk } from 'tuya-panel-kit';
 import Strings from '../i18n';
@@ -129,7 +129,7 @@ const useDpDataCenter = (managerContext: ManagerContextType): Partial<DPState> =
       const timestamp = moment(e.timestamp * 1000).format('YYYY-MM-DD HH:mm:ss');
       setVideoTime(timestamp);
     };
-    RCTDeviceEventEmitter.addListener('video_timestamp', videoTimeListener);
+    DeviceEventEmitter.addListener('video_timestamp', videoTimeListener);
 
     DP.listen('unlock_request').reply(unlock => {
       setCountTime(Number(unlock));
@@ -184,7 +184,7 @@ const useDpDataCenter = (managerContext: ManagerContextType): Partial<DPState> =
     return () => {
       DP.off();
       dismissReqeustForImage();
-      RCTDeviceEventEmitter.removeListener('video_timestamp', videoTimeListener);
+      DeviceEventEmitter.removeListener('video_timestamp', videoTimeListener);
     };
   }, []);
 

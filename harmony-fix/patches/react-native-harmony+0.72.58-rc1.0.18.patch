@@ -1,0 +1,21 @@
+diff --git a/node_modules/react-native-harmony/index.js b/node_modules/react-native-harmony/index.js
+index f67319a..afa1d11 100644
+--- a/node_modules/react-native-harmony/index.js
++++ b/node_modules/react-native-harmony/index.js
+@@ -240,4 +240,16 @@ module.exports = {
+   get ViewPropTypes() {
+     return require("./Libraries/partner/deprecated-react-native-prop-types/index");
+   },
++  get ART() {
++    return require('@tuya-oh/art');
++  },
++  get ColorPropType() {
++    return require('deprecated-react-native-prop-types').ColorPropType;
++  },
++  get Picker() {
++    return require('@react-native-picker/picker').Picker;
++  },
++  get AsyncStorage() {
++    return require('@react-native-oh-tpl/async-storage').default;
++  }
+ };
