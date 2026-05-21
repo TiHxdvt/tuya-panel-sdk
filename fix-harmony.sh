@@ -40,6 +40,9 @@ echo "==> 6. 安装依赖 (含 patch 自动应用)..."
 cd "$HO_DIR"
 yarn install
 
+echo "==> 7. 清理 yarn install 重建的 packages/node_modules 软链接..."
+rm -f "$SCRIPT_DIR/packages/node_modules"
+
 echo ""
 echo "修复完成! 现在可以运行:"
 echo "  cd example_HO && yarn start --reset-cache"
