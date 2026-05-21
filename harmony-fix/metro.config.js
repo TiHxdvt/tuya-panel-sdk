@@ -232,6 +232,19 @@ const config = {
         return { type: "sourceFile", filePath: matrixStub };
       }
 
+      // ========== Drawer 动画修复（鸿蒙）：重定向到 PanResponder 在 mask 上的版本 ==========
+      if (
+        context.originModulePath &&
+        context.originModulePath.includes("tuya-panel-animation-sdk") &&
+        context.originModulePath.endsWith("lib/index.js") &&
+        moduleName === "./components/drawer"
+      ) {
+        const drawerFix = path.resolve(__dirname, "patches/drawer-fix.js");
+        if (fs.existsSync(drawerFix)) {
+          return { type: "sourceFile", filePath: drawerFix };
+        }
+      }
+
       // 兜底：直接调用 harmony 解析器（不是 context.resolveRequest，避免递归）
       return harmonyConfig.resolver.resolveRequest(
         context,
